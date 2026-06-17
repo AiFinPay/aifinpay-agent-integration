@@ -73,7 +73,7 @@ print("Fund this address:", agent.address)
 
 # Autonomously settles the 402 challenge on-chain, returns the response
 resp = agent.pay(
-    "https://bridge.aifinpay.company/io-net/chat/completions",
+    "https://bridge.aifinpay.io/io-net/chat/completions",
     body={"model": "meta-llama/Llama-3.3-70B-Instruct",
           "messages": [{"role": "user", "content": "Hello"}]},
 )
@@ -153,7 +153,7 @@ identity.
 | Quickstart (60-second first paid call) | `QUICKSTART.md` |
 | MCP client matrix | `MCP_CONFIG.md` |
 | Partner onboarding (sell a service) | `PARTNER_ONBOARDING.md` |
-| Live site | `aifinpay.company` |
+| Live site | `aifinpay.io` |
 
 ---
 
