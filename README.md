@@ -1,165 +1,83 @@
 # AiFinPay — Integration Guide for AI Agent Builders
 
-**Give any AI agent a wallet.** AiFinPay is the payment rail for autonomous
-AI agents — *Stripe for agents*. One line of code — `agent.pay(url)` — lets
-any agent hold a wallet, pay for any service per call, and settle a real
-on-chain payment (Polygon / Solana mainnet), then receive the gated response.
-Non-custodial, no KYC, no API key, no custodian.
+AiFinPay provides non-custodial payment and identity primitives for autonomous
+agents through the SDK, MCP and HTTP 402 flows.
 
-Works with any framework or platform — **AutoGPT, LangChain, CrewAI, OpenAI
-Agents, Flowise, Claude Desktop, Cursor**, or your own agent code. This guide
-shows the three ways to integrate, leading with the universal one: **MCP**.
+## Protocol map
 
----
+| Protocol | Responsibility | Economics |
+|---|---|---|
+| **AIFP-1** | Merchant paywalls, quotes, settlement and metered receipts | payer pays quoted gross; merchant 99%; AiFinPay 1%; creator 0% |
+| **AIFP-2 / x402** | Provider HTTP 402 negotiation and payment transport | provider 100%; AiFinPay 0%; creator 0%; gas separate |
+| **AIFP-3** | Agent Passport identity/attestation | no settlement economics |
 
-## Why this fits any autonomous agent
+AIFP-1 is gross-inclusive; nothing is added on top. AIFP-2/x402 has a temporary
+0% AiFinPay protocol fee for the current launch period.
 
-Autonomous agents run unattended and call paid services — inference, search,
-vector DBs, APIs. Today each of those needs a human's API key and credit card.
-With AiFinPay, the **agent itself** carries a wallet and pays per call — the
-missing money layer for agents that do real work.
-
-Each agent gets its own address, a USDC balance, a spend limit, and a
-transaction history of what it spent on which service.
-
----
-
-## Option 1 — MCP (recommended, zero-code)
-
-Any MCP-compatible client or agent platform — AutoGPT, Claude Desktop, Cursor,
-Windsurf, Continue, Cline — gains five payment tools with one config block. No
-SDK calls to wire by hand.
+## MCP
 
 ```json
 {
   "mcpServers": {
     "aifinpay": {
       "command": "npx",
-      "args": ["@aifinpay/mcp"]
+      "args": ["@aifinpay/mcp"],
+      "env": {
+        "AIFINPAY_AGENT_SECRET": "<persistent local secret>",
+        "AIFINPAY_MAX_USD": "0.50"
+      }
     }
   }
 }
 ```
 
-The model now has these tools:
-
-| Tool | What it does |
+| Tool | Status |
 |---|---|
-| `agent_address` | Returns the agent's wallet address (to fund / display) |
-| `agent_quote` | Price-checks an x402-gated URL before paying |
-| `payable_fetch` | Fetches a URL; auto-settles the 402 challenge on-chain |
-| `pay_with_split` | Direct B2B payment with the on-chain split |
-| `quote_split` | Previews the split (merchant / treasury / fee) |
+| `agent_address` | Read-only local identity. |
+| `agent_quote` | Read-only challenge inspection. |
+| `payable_fetch` | Fund-moving only when all target/value/runtime gates pass. |
+| `agent_call` | Registry-resolved provider call with the same gates. |
+| `pay_with_split` | Retired compatibility tool; moves no funds. |
+| `quote_split` | Retired compatibility tool; use a canonical AIFP-1 quote. |
 
-That's the whole integration. The agent can now autonomously pay any
-x402-gated API and get the gated response back.
-
----
-
-## Option 2 — Python / Node SDK (programmatic)
+## SDK
 
 ```bash
-pip install aifinpay-agent --pre      # Python
-npm install @aifinpay/agent@alpha     # Node / TypeScript
+pip install aifinpay-agent
+npm install @aifinpay/agent
 ```
 
-The "agent pays in a few lines" example — the core of the product:
+Use `SettlementClient` for canonical v1.3 AIFP settlement. Before a wallet
+signs, validate the invoice and independently verify the trusted route pin:
 
-```python
-from aifinpay import Agent
+- route class and chain ID;
+- splitter v1.3 address and exact runtime hash;
+- on-chain BPS profile (AIFP-1 `100/0`, AIFP-2 `0/0`);
+- merchant/provider target and asset metadata;
+- quote expiry and exact gross calldata;
+- operator USD ceiling and trusted asset price.
 
-agent = Agent.new()                       # fresh wallet / keypair
-print("Fund this address:", agent.address)
+A backend response cannot be its own trust anchor.
 
-# Autonomously settles the 402 challenge on-chain, returns the response
-resp = agent.pay(
-    "https://bridge.aifinpay.io/io-net/chat/completions",
-    body={"model": "meta-llama/Llama-3.3-70B-Instruct",
-          "messages": [{"role": "user", "content": "Hello"}]},
-)
-print(resp.json()["choices"][0]["message"]["content"])
-print("tx hash:", resp.headers.get("x-payment-receipt"))
-```
+## Production boundary
 
-Node is identical: `Agent.new()` → `agent.pay(url, { body })`. Persist
-`agent.secret_b58` for a durable identity across restarts
-(`Agent.from_secret(...)`), and read balance with
-`agent.balance(asset="USDC", chain="polygon")`.
+A merged contract, address, logo, explorer link or historical transaction does
+not prove that a current route is payment-live. Activation additionally
+requires a clean package build, controlled paid E2E for the exact release and no
+unresolved Critical/High fund-loss audit issue. Otherwise the SDK/MCP path must
+fail closed.
 
----
+## Agent Passport
 
-## Option 3 — Framework adapters (drop-in)
+AIFP-3 is the Agent Passport identity layer. Identity ownership, attestations
+and reputation can be referenced during a payment flow, but AIFP-3 does not
+mint a payment receipt and does not change AIFP-1/AIFP-2 economics.
 
-The SDK ships ready-made examples for the major agent frameworks — clone and
-run:
+## References
 
-```
-github.com/AiFinPay/sdk → examples/
-```
+- Protocols: `github.com/AiFinPay/AIFP-1`, `AIFP-2`, `AIFP-3`
+- SDK/MCP: `github.com/AiFinPay/sdk`
+- Documentation: `github.com/AiFinPay/docs`
+- Canonical domain: `https://aifinpay.io`
 
-| Framework | Example |
-|---|---|
-| AutoGPT-style headless loop | `examples/autogpt/` (self-funding agent on a budget) |
-| LangChain | `examples/langchain/` |
-| CrewAI | `examples/crewai/` |
-| OpenAI Agents | `examples/openai-agent/` |
-| Flowise | `examples/flowise/` |
-| Claude (MCP) | `examples/claude-mcp/` |
-
-Each is the canonical pattern for plugging `agent.pay()` into an existing
-pipeline.
-
----
-
-## Under the hood — settlement & events
-
-```
-agent → SDK / MCP → x402 challenge (HTTP 402) → agent signs + pays
-      → on-chain atomic split → gated response returned to agent
-```
-
-- Settlement **is** the transaction — non-custodial, no intermediate hold.
-- Each successful call emits one on-chain `Payment` event on the verified
-  splitter contract.
-- The protocol fee (1%) is collected automatically by the splitter — no
-  revenue-share bookkeeping, no contract to sign.
-
-### Webhooks (real-time events)
-
-Partners subscribe a URL to events and receive HMAC-signed deliveries with
-automatic retries:
-
-- Events: `payment.intent`, `payment.completed`, `seat.reserved`,
-  `b2b.pay_with_split.invoice`
-- `POST /api/webhooks` to subscribe; each delivery is signed
-  (`x-aifinpay-signature: t=<ts>,v1=<hmac>`) — verify with the shared secret.
-
----
-
-## Becoming a paid service (sell to agents)
-
-Want agents to pay *you*? Stand up a paid bridge in ~30 minutes and earn per
-call — full steps in the SDK's `PARTNER_ONBOARDING.md`. You keep your API key
-and upstream relationship; AiFinPay handles the payment rail and agent
-identity.
-
----
-
-## Reference
-
-| Resource | Where |
-|---|---|
-| SDK + all framework examples | `github.com/AiFinPay/sdk` |
-| Quickstart (60-second first paid call) | `QUICKSTART.md` |
-| MCP client matrix | `MCP_CONFIG.md` |
-| Partner onboarding (sell a service) | `PARTNER_ONBOARDING.md` |
-| Live site | `aifinpay.io` |
-
----
-
-## Suggested first step
-
-1. Add the MCP block (Option 1) — instant payment tools for your agent.
-2. Run the example for your framework (`examples/`) to see a paid call live.
-3. Ping us to design the embedded wallet UI (balance + spend limit + per-service
-   history) on top of the MCP/SDK.
+MIT © AiFinPay
