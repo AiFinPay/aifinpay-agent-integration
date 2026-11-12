@@ -7,11 +7,13 @@ agents through the SDK, MCP and HTTP 402 flows.
 
 | Protocol | Responsibility | Economics |
 |---|---|---|
-| **AIFP-1** | Merchant paywalls, quotes, settlement and metered receipts | payer pays quoted gross; merchant 99%; AiFinPay 1%; creator 0% |
+| **AIFP-1** | Merchant paywalls, quotes, settlement and metered receipts | payer pays quoted gross; protocol fee included, split shown in each quote; creator 0% |
 | **AIFP-2 / x402** | Provider HTTP 402 negotiation and payment transport | provider 100%; AiFinPay 0%; creator 0%; gas separate |
 | **AIFP-3** | Agent Passport identity/attestation | no settlement economics |
 
-AIFP-1 is gross-inclusive; nothing is added on top. AIFP-2/x402 has a temporary
+AIFP-1 is gross-inclusive: a protocol fee is included in the quoted price,
+never added on top. Each quote and the on-chain transaction show the exact
+split between the merchant and the protocol. AIFP-2/x402 has a temporary
 0% AiFinPay protocol fee for the current launch period.
 
 ## MCP
